@@ -1,5 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const html=fs.readFileSync(__dirname+'/index.html','utf8');
+const html=fs.readFileSync(__dirname+'/apps-script/Index.html','utf8');
 const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(x=>x[1]);
 scripts.forEach(s=>new vm.Script(s));new vm.Script(fs.readFileSync(__dirname+'/apps-script/Code.gs','utf8'));
 const context=vm.createContext({Intl,Date,Error});vm.runInContext(scripts.find(s=>s.includes('function parseActivity')),context);
