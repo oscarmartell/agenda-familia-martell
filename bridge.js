@@ -1,7 +1,7 @@
 // La interfaz vive en GitHub; Google solo transporta las operaciones del calendario.
 window.familyBridge=(()=>{
   const channel=crypto.randomUUID(),pending=new Map();
-  const methods=new Set(['login','logout','changePin','listActivities','createActivity','completeActivity','rescheduleActivity']);
+  const methods=new Set(['login','logout','listActivities','createActivity','completeActivity','rescheduleActivity']);
   let peer=null,origin='',connected=false,deadline;
   const api={onReady:()=>{},onError:()=>{}};
   function fromOurFrame(source){
