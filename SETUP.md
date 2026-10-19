@@ -1,35 +1,31 @@
-# Agenda Familia Martell: acceso por enlace
+# Agenda Familia Martell: GitHub con PIN familiar de 4 números
 
-Esta versión no pide contraseña adicional. Cualquier persona que tenga el enlace y pueda abrir el despliegue de Google puede leer, agregar y reagendar actividades de Familia. GitHub Pages abre directamente esa agenda, sin datos de demostración.
+La dirección visible es https://oscarmartell.github.io/agenda-familia-martell/. GitHub contiene la agenda servida por Google Apps Script dentro de un iframe; no redirige. El PIN se comprueba en el servidor y nunca se guarda en GitHub, en el HTML ni en el calendario.
 
-## Actualizar
+## Actualizar la implementación actual
 
-1. Reemplazar Código.gs en Google Apps Script por apps-script/Code.gs.
-2. Reemplazar el HTML llamado Index (I mayúscula) por apps-script/Index.html. No usar el index.html de la raíz, que solo abre el enlace.
-3. Guardar. Implementar → Administrar implementaciones → implementación actual → lápiz → Nueva versión → Implementar.
-4. Abrir el mismo enlace /exec y recargar. No se pide contraseña. Hasta publicar esta versión, sigue funcionando la anterior.
+1. En Google Apps Script reemplazar Código.gs por apps-script/Code.gs y el HTML Index por apps-script/Index.html. Conservar la I mayúscula. No copiar index.html de la raíz, que es el contenedor de GitHub.
+2. Configuración del proyecto → Propiedades: conservar FAMILY_CALENDAR_ID y establecer FAMILY_PASSWORD con un PIN de exactamente 4 números (puede comenzar con cero). No escribirla en GitHub ni compartirla en el chat.
+3. Guardar y publicar en la misma implementación: Implementar → Administrar implementaciones → implementación actual → lápiz → Nueva versión → Implementar. Para poder mostrarla dentro de GitHub sin inicio de sesión de Google, el despliegue debe permitir cualquier usuario y ejecutarse como la cuenta dueña. La contraseña de esta aplicación protege todas las lecturas y escrituras.
+4. Archivar otras implementaciones antiguas que hayan quedado activas sin contraseña, para que no conserven acceso por sus enlaces. Actualizar esta implementación no modifica automáticamente las demás.
+5. Abrir la página de GitHub y recargar. Ingresar la contraseña para ver Familia. Probar desde el celular. Si el navegador o Google Workspace bloquea la integración, informar el mensaje: la integración en producción necesita verificación real.
 
-Conservar FAMILY_CALENDAR_ID en las propiedades del proyecto. FAMILY_PASSWORD ya no se utiliza y se puede eliminar. No es necesario compartir ni modificar la contraseña de Google.
+La URL /exec actual debe permanecer en config.js, en FAMILY_APP_URL. Si se crea otra implementación cambia la URL; preferir editar la existente. El dominio visible del navegador será GitHub aunque el contenido privado se sirva desde Google.
 
-## Primera instalación
+## Protección de la integración
 
-Crear un proyecto en https://script.google.com/home/start con la cuenta que administra Familia, agregar los archivos de apps-script y elegir la zona horaria de Buenos Aires. Configurar FAMILY_CALENDAR_ID con el ID de Familia. La app rechaza el calendario principal y calendarios que no se llamen Familia.
+Apps Script habilita ALLOWALL para poder mostrar la página en un iframe. Antes de mostrar el formulario se verifica un intercambio de mensajes con la ventana superior cuyo origen debe ser exactamente https://oscarmartell.github.io. GitHub rechaza ejecutarse dentro de otra ventana y solo responde a orígenes oficiales de Google. Ningún mensaje transmite contraseña ni token. Abrir el enlace de Google directamente ofrece volver a GitHub.
 
-Publicar como aplicación web ejecutando como la cuenta dueña. Elegir quién puede abrir la app; Cualquier usuario permite acceso por enlace sin otra contraseña. Las políticas de Google Workspace pueden restringir visitantes externos. Autorizar Calendar.
+Las sesiones son temporales y están ligadas a la contraseña vigente. Cambiar FAMILY_PASSWORD invalida sesiones previas; los tokens de la versión de acceso público tampoco se aceptan. Diez intentos de contraseña incorrecta bloquean los nuevos ingresos hasta 15 minutos de forma global. Es una clave compartida, sin identificación individual.
 
-## GitHub Pages
+## Comportamiento
 
-Settings → Pages → Deploy from a branch → main → / (root) → Save. En config.js, FAMILY_APP_URL debe contener la URL /exec actual. Pages redirige a Google y ofrece un botón alternativo.
-
-## Funciones
-
-- Agenda compacta desde hoy, sin días vacíos; encabezado y controles fijos, lista desplazable y navegación entre meses.
-- Texto con reglas de fechas y horas, sin audio ni API de IA. Ejemplo: 22/10 odontóloga Heidi 14 horas. Se confirma antes de guardar. Horario argentino; duración sugerida de una hora, editable. Para eventos nuevos que crucen medianoche, usar Google Calendar.
-- Completado se guarda en las propiedades de esta aplicación y no modifica Google Calendar. Es compartido entre quienes usan la implementación. Las etiquetas guardadas por versiones antiguas no se borran ni reutilizan.
-- Reagendar modifica el mismo evento en Familia tras confirmar fecha y horario. Conserva título, lugar y estado completado. Eventos de todo el día conservan su duración. Series recurrentes se reagendan desde Calendar; el completado admite una marca por ocurrencia.
-- Los cambios concurrentes se rechazan y reintentar el mismo reagendado no crea duplicados.
-- La sesión temporal se inicia automáticamente, sin contraseña. Si vence, recargar la página. No identifica al visitante: cualquiera con acceso a la app puede obtener una sesión.
+- Calendario limitado a Familia por ID y nombre; no se usa el calendario principal.
+- Agenda desde hoy, días vacíos ocultos, encabezado fijo y navegación mensual.
+- Carga por texto con reglas, sin IA ni audio, con revisión antes de guardar.
+- Completado se guarda solo en propiedades de la app, sin cambios en Google Calendar.
+- Reagendar modifica el mismo evento, tras confirmación. Las series recurrentes se reagendan desde Google Calendar. Se rechazan cambios concurrentes y los reintentos no duplican eventos.
 
 ## Verificación
 
-Ejecutar node check.cjs, node ui-check.cjs y node server-check.cjs. Las pruebas usan servicios simulados y no comprueban el despliegue ni el acceso real. El dueño debe verificar la lectura y probar una actividad identificada.
+node check.cjs comprueba interpretación y sintaxis; node ui-check.cjs comprueba la agenda y el intercambio de mensajes permitido/rechazado; node server-check.cjs comprueba contraseña, sesiones, completado sin escrituras en Calendar y reagendado. Son pruebas con servicios simulados. No se ha comprobado la integración real en el navegador ni la publicación de Apps Script hasta que el dueño lo confirme.
