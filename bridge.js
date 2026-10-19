@@ -2,7 +2,7 @@
 window.familyBridge=(()=>{
   const channel=crypto.randomUUID(),pending=new Map();
   const methods=new Set(['login','logout','listActivities','createActivity','completeActivity','rescheduleActivity']);
-  let peer=null,origin='',connected=false,deadline;
+  let peer=null,origin='',connected=false,deadline,connection=null,resolveConnection,rejectConnection;
   const api={onReady:()=>{},onError:()=>{}};
   function fromOurFrame(source){
     const frame=document.getElementById('calendarBridge');
@@ -16,18 +16,24 @@ window.familyBridge=(()=>{
       peer=e.source;origin=e.origin;peer.postMessage({type:'familia:bridge-bind',channel},origin);return;
     }
     if(e.source!==peer||e.origin!==origin||d.channel!==channel)return;
-    if(d.type==='familia:bridge-ready'){connected=true;clearTimeout(deadline);api.onReady();return}
-    if(d.type==='familia:bridge-error'){api.onError(d.error||'No se pudo conectar con Familia.');return}
+    if(d.type==='familia:bridge-ready'){connected=true;clearTimeout(deadline);resolveConnection?.();api.onReady();return}
+    if(d.type==='familia:bridge-error'){fail(d.error||'No se pudo conectar con Familia.');return}
     if(d.type==='familia:bridge-result'){
       const item=pending.get(d.id);if(!item)return;pending.delete(d.id);clearTimeout(item.timer);
       if(d.error)item.reject(Error(d.error));else item.resolve(d.result);
     }
   });
+  function fail(message){clearTimeout(deadline);connected=false;connection=null;rejectConnection?.(Error(message));api.onError(message)}
   api.start=()=>{
+    if(connected)return Promise.resolve();
+    if(connection)return connection;
     const url=window.FAMILY_APP_URL;
-    if(typeof url!=='string'||!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)){api.onError('Falta configurar la conexión con Familia.');return}
-    document.getElementById('calendarBridge').src=url+'?bridge=1';
-    deadline=setTimeout(()=>api.onError('No se pudo conectar. Si acabás de actualizar la web, publicá la nueva versión de los dos archivos en Apps Script y recargá.'),25000);
+    if(typeof url!=='string'||!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url))return Promise.reject(Error('Falta configurar la conexión con Familia.'));
+    peer=null;origin='';
+    connection=new Promise((resolve,reject)=>{resolveConnection=resolve;rejectConnection=reject});
+    document.getElementById('calendarBridge').src=url+'?bridge=1&attempt='+crypto.randomUUID();
+    deadline=setTimeout(()=>fail('No se pudo conectar con Familia. Revisá que la misma implementación de Apps Script tenga publicados los dos archivos actuales y volvé a intentar.'),25000);
+    return connection;
   };
   api.call=(name,args)=>new Promise((resolve,reject)=>{
     if(!connected)return reject(Error('Esperá a que se conecte la agenda.'));
