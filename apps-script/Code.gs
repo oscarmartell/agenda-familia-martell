@@ -12,18 +12,14 @@ function calendar_(){
 }
 function digest_(s){return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,s,Utilities.Charset.UTF_8));}
 function equal_(a,b){let n=a.length^b.length;for(let i=0;i<Math.max(a.length,b.length);i++)n|=(a.charCodeAt(i)||0)^(b.charCodeAt(i)||0);return n===0;}
-function login(password){
- const lock=LockService.getScriptLock();lock.waitLock(10000);
- try{
-  const cache=CacheService.getScriptCache(), failures=Number(cache.get('login_failures')||0);
-  if(failures>=10)throw new Error('Demasiados intentos. Esperá 15 minutos y volvé a intentar.');
-  const expected=props_().getProperty('FAMILY_PASSWORD');
-  if(!expected||expected.length<16)throw new Error('El dueño debe configurar una contraseña de al menos 16 caracteres.');
-  if(typeof password!=='string'||password.length>256||!equal_(digest_(password),digest_(expected))){cache.put('login_failures',String(failures+1),900);throw new Error('Contraseña incorrecta.');}
-  cache.remove('login_failures');const token=Utilities.getUuid()+Utilities.getUuid();cache.put('session:'+digest_(token),'ok',21600);return token;
- }finally{lock.releaseLock();}
+// Acceso por enlace, solicitado por el dueño. No requiere contraseña ni cuenta familiar.
+// Cualquier visitante autorizado por el despliegue de Google puede iniciar una sesión.
+function login(){
+ const token=Utilities.getUuid()+Utilities.getUuid();
+ CacheService.getScriptCache().put('session:'+digest_(token),'ok',21600);
+ return token;
 }
-function auth_(token){if(typeof token!=='string'||token.length>100||CacheService.getScriptCache().get('session:'+digest_(token))!=='ok')throw new Error('La sesión venció. Salí y volvé a ingresar.');}
+function auth_(token){if(typeof token!=='string'||token.length>100||CacheService.getScriptCache().get('session:'+digest_(token))!=='ok')throw new Error('La sesión venció. Recargá la página para continuar.');}
 function logout(token){auth_(token);CacheService.getScriptCache().remove('session:'+digest_(token));}
 function validDay_(s){return typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Utilities.formatDate(new Date(s+'T12:00:00-03:00'),'America/Argentina/Buenos_Aires','yyyy-MM-dd')===s;}
 function listActivities(token,from,to){
