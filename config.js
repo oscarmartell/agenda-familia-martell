@@ -1,2 +1,2 @@
-// Conexión con calendario. El PIN de entrada se comprueba solo en la página de GitHub.
+// Conexión con calendario. La agenda abre directamente, sin contraseña.
 window.FAMILY_APP_URL = 'https://script.google.com/macros/s/AKfycbwo5y73C35P6vY7q7uA52EzMTYsKpYvk-5HKz47OsjebN0UIb-rWQpqelOS-fZOHcY4/exec';
