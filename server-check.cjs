@@ -5,6 +5,10 @@ const propertyStore={getProperty:k=>values.get(k)||null,getProperties:()=>Object
 const cal={getName:()=> 'Familia',getEventById(id){reads++;return id==='event1'?event:null},getEvents(){reads++;return [event]}};
 const ctx=vm.createContext({Date,Error,console,PropertiesService:{getScriptProperties:()=>propertyStore},CacheService:{getScriptCache:()=>({get:k=>cache.get(k)||null})},Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(a,s)=>crypto.createHash(a).update(s).digest(),base64EncodeWebSafe:b=>Buffer.from(b).toString('base64url'),formatDate:d=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).format(d)},CalendarApp:{getCalendarById:id=>id==='family-id'?cal:null},LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})}});
 vm.runInContext(fs.readFileSync(__dirname+'/apps-script/Code.gs','utf8'),ctx);
+// El inicio de sesión público emite un token sin leer ninguna contraseña.
+ctx.Utilities.getUuid=()=>crypto.randomUUID();
+ctx.CacheService.getScriptCache=()=>({get:k=>cache.get(k)||null,put:(k,v)=>cache.set(k,v)});
+const openToken=ctx.login();assert.ok(openToken.length>32);ctx.auth_(openToken);
 assert.throws(()=>ctx.completeActivity('invalid','event1',started.toISOString(),true),/sesión/);assert.equal(reads,0);cache.set('session:'+ctx.digest_('authorized'),'ok');
 ctx.completeActivity('authorized','event1',started.toISOString(),true);assert.equal(writes,0);assert.equal(values.get(ctx.doneKey_('event1',started.toISOString(),false)),'true');assert.equal(ctx.listActivities('authorized','2026-10-19','2026-11-01')[0].done,true);
 ctx.completeActivity('authorized','event1',started.toISOString(),false);assert.equal(writes,0);assert.equal(ctx.listActivities('authorized','2026-10-19','2026-11-01')[0].done,false);
