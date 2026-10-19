@@ -23,10 +23,20 @@ function listActivities(token,from,to){
  const states=props_().getProperties();
  return calendar_().getEvents(a,b).map(function(e){const allDay=e.isAllDayEvent(),recurring=e.isRecurringEvent(),start=e.getStartTime().toISOString();return {id:e.getId(),title:e.getTitle(),start:start,end:e.getEndTime().toISOString(),allDay:allDay,recurring:recurring,startDay:allDay?Utilities.formatDate(e.getAllDayStartDate(),Session.getScriptTimeZone(),'yyyy-MM-dd'):null,endDay:allDay?Utilities.formatDate(e.getAllDayEndDate(),Session.getScriptTimeZone(),'yyyy-MM-dd'):null,location:e.getLocation(),done:states[doneKey_(e.getId(),start,recurring)]==='true'};});
 }
+
+function activityTimes_(p){
+ if(!p||!validDay_(p.date)||typeof p.time!=='string'||typeof p.end!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.time)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.end))throw new Error('Revisá la fecha y el horario de la actividad.');
+ const endDay=p.endDate||p.date;
+ if(!validDay_(endDay))throw new Error('Revisá la fecha de finalización.');
+ const a=new Date(p.date+'T'+p.time+':00-03:00'),b=new Date(endDay+'T'+p.end+':00-03:00'),duration=b-a;
+ if(duration<3600000||duration>86400000)throw new Error('La actividad debe durar como mínimo una hora y como máximo 24 horas.');
+ return [a,b];
+}
+
 function createActivity(token,p){
  auth_(token);
- if(!p||typeof p.title!=='string'||!p.title.trim()||p.title.length>180||!validDay_(p.date)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.time)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.end)||p.end<=p.time||typeof p.location!=='string'||p.location.length>250||typeof p.requestId!=='string'||! /^[a-zA-Z0-9-]{20,80}$/.test(p.requestId))throw new Error('Revisá los datos de la actividad.');
- const a=new Date(p.date+'T'+p.time+':00-03:00'),b=new Date(p.date+'T'+p.end+':00-03:00');
+ if(!p||typeof p.title!=='string'||!p.title.trim()||p.title.length>180||!validDay_(p.date)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.time)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.end)||typeof p.location!=='string'||p.location.length>250||typeof p.requestId!=='string'||! /^[a-zA-Z0-9-]{20,80}$/.test(p.requestId))throw new Error('Revisá los datos de la actividad.');
+ const times=activityTimes_(p),a=times[0],b=times[1];
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{
   const cal=calendar_(),matches=cal.getEvents(new Date(p.date+'T00:00:00-03:00'),new Date(p.date+'T23:59:59-03:00'));
@@ -54,7 +64,7 @@ function rescheduleActivity(token,p){
   if(event.isRecurringEvent())throw new Error('Para cambiar una repetición, abrí Google Calendar. Las actividades individuales sí se pueden reagendar aquí.');
   const allDay=event.isAllDayEvent();let a,b;
   if(allDay){const duration=Math.round((new Date(p.originalEnd)-new Date(p.originalStart))/86400000);if(duration<1||duration>366)throw new Error('Duración inválida.');a=new Date(p.date+'T00:00:00-03:00');b=new Date(a.getTime()+duration*86400000);}
-  else {if(typeof p.time!=='string'||typeof p.end!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.time)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.end)||p.end<=p.time)throw new Error('Revisá el horario de inicio y fin.');a=new Date(p.date+'T'+p.time+':00-03:00');b=new Date(p.date+'T'+p.end+':00-03:00');}
+  else {const times=activityTimes_(p);a=times[0];b=times[1];}
   // Reintentos a la misma fecha son seguros; no se crea un segundo evento.
   if(event.getStartTime().getTime()===a.getTime()&&event.getEndTime().getTime()===b.getTime())return {id:event.getId(),unchanged:true};
   if(event.getStartTime().getTime()!==new Date(p.originalStart).getTime()||event.getEndTime().getTime()!==new Date(p.originalEnd).getTime())throw new Error('El evento cambió desde que abriste la agenda. Actualizá y volvé a intentarlo.');
