@@ -11,7 +11,7 @@ function calendar_(){
   return calendar;
 }
 function digest_(s){return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,s,Utilities.Charset.UTF_8));}
-// Acceso público al servicio, elegido por el dueño. El PIN visual existe solo en GitHub.
+// Acceso público al servicio, elegido por el dueño. La agenda abre directamente sin PIN.
 // El token ordena las sesiones; no prueba identidad ni protege el acceso directo a Calendar.
 function login(){const token=Utilities.getUuid()+Utilities.getUuid();CacheService.getScriptCache().put('session:'+digest_(token),'ok',21600);return token;}
 function auth_(token){if(typeof token!=='string'||token.length>100||CacheService.getScriptCache().get('session:'+digest_(token))!=='ok')throw new Error('La sesión venció. Recargá la agenda.');}
