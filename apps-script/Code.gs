@@ -1,6 +1,6 @@
 /** Todas las operaciones quedan limitadas a un único calendario, configurado por el dueño. */
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index').setTitle('Familia · Nuestra agenda').addMetaTag('viewport','width=device-width,initial-scale=1');
+  return HtmlService.createHtmlOutputFromFile('Index').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).setTitle('Agenda Familia Martell').addMetaTag('viewport','width=device-width,initial-scale=1');
 }
 function props_(){ return PropertiesService.getScriptProperties(); }
 function calendar_(){
@@ -12,14 +12,19 @@ function calendar_(){
 }
 function digest_(s){return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,s,Utilities.Charset.UTF_8));}
 function equal_(a,b){let n=a.length^b.length;for(let i=0;i<Math.max(a.length,b.length);i++)n|=(a.charCodeAt(i)||0)^(b.charCodeAt(i)||0);return n===0;}
-// Acceso por enlace, solicitado por el dueño. No requiere contraseña ni cuenta familiar.
-// Cualquier visitante autorizado por el despliegue de Google puede iniciar una sesión.
-function login(){
- const token=Utilities.getUuid()+Utilities.getUuid();
- CacheService.getScriptCache().put('session:'+digest_(token),'ok',21600);
- return token;
+// La contraseña se valida en el servidor y nunca se incluye en GitHub ni en el HTML.
+function login(password){
+ const lock=LockService.getScriptLock();lock.waitLock(10000);
+ try{
+  const cache=CacheService.getScriptCache(),failures=Number(cache.get('password_failures')||0);
+  if(failures>=10)throw new Error('Demasiados intentos. Esperá 15 minutos.');
+  const expected=props_().getProperty('FAMILY_PASSWORD');
+  if(!expected||!/^\d{4}$/.test(expected))throw new Error('Configurá FAMILY_PASSWORD con un PIN de exactamente 4 números en las propiedades de Apps Script.');
+  if(typeof password!=='string'||!/^\d{4}$/.test(password)||!equal_(digest_(password),digest_(expected))){cache.put('password_failures',String(failures+1),900);throw new Error('PIN incorrecto.');}
+  cache.remove('password_failures');const token=Utilities.getUuid()+Utilities.getUuid();cache.put('session:'+digest_(token),digest_(expected),21600);return token;
+ }finally{lock.releaseLock();}
 }
-function auth_(token){if(typeof token!=='string'||token.length>100||CacheService.getScriptCache().get('session:'+digest_(token))!=='ok')throw new Error('La sesión venció. Recargá la página para continuar.');}
+function auth_(token){const expected=props_().getProperty('FAMILY_PASSWORD');if(!expected||!/^\d{4}$/.test(expected)||typeof token!=='string'||token.length>100||CacheService.getScriptCache().get('session:'+digest_(token))!==digest_(expected))throw new Error('La sesión venció. Recargá e ingresá de nuevo.');}
 function logout(token){auth_(token);CacheService.getScriptCache().remove('session:'+digest_(token));}
 function validDay_(s){return typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Utilities.formatDate(new Date(s+'T12:00:00-03:00'),'America/Argentina/Buenos_Aires','yyyy-MM-dd')===s;}
 function listActivities(token,from,to){
