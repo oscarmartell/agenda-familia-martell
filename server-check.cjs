@@ -1,15 +1,20 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),crypto=require('node:crypto');
-const values=new Map([['FAMILY_CALENDAR_ID','family-id']]),cache=new Map();let writes=0,reads=0,started=new Date('2026-10-22T14:00:00-03:00'),ended=new Date('2026-10-22T15:00:00-03:00');
+const values=new Map([['FAMILY_CALENDAR_ID','family-id'],['FAMILY_PASSWORD','2468']]),cache=new Map();let writes=0,reads=0,started=new Date('2026-10-22T14:00:00-03:00'),ended=new Date('2026-10-22T15:00:00-03:00');
 const event={getId:()=> 'event1',isRecurringEvent:()=>false,isAllDayEvent:()=>false,getTitle:()=> 'Odontóloga',getLocation:()=>'',getStartTime:()=>started,getEndTime:()=>ended,setTime(a,b){writes++;started=a;ended=b},setTag(){throw Error('Completado no debe escribir etiquetas en Calendar')}};
 const propertyStore={getProperty:k=>values.get(k)||null,getProperties:()=>Object.fromEntries(values),setProperty(k,v){values.set(k,v)},deleteProperty(k){values.delete(k)}};
 const cal={getName:()=> 'Familia',getEventById(id){reads++;return id==='event1'?event:null},getEvents(){reads++;return [event]}};
 const ctx=vm.createContext({Date,Error,console,PropertiesService:{getScriptProperties:()=>propertyStore},CacheService:{getScriptCache:()=>({get:k=>cache.get(k)||null})},Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(a,s)=>crypto.createHash(a).update(s).digest(),base64EncodeWebSafe:b=>Buffer.from(b).toString('base64url'),formatDate:d=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).format(d)},CalendarApp:{getCalendarById:id=>id==='family-id'?cal:null},LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})}});
 vm.runInContext(fs.readFileSync(__dirname+'/apps-script/Code.gs','utf8'),ctx);
-// El inicio de sesión público emite un token sin leer ninguna contraseña.
+// La contraseña es una cadena de prueba; nunca se usan secretos de la agenda real.
 ctx.Utilities.getUuid=()=>crypto.randomUUID();
-ctx.CacheService.getScriptCache=()=>({get:k=>cache.get(k)||null,put:(k,v)=>cache.set(k,v)});
-const openToken=ctx.login();assert.ok(openToken.length>32);ctx.auth_(openToken);
-assert.throws(()=>ctx.completeActivity('invalid','event1',started.toISOString(),true),/sesión/);assert.equal(reads,0);cache.set('session:'+ctx.digest_('authorized'),'ok');
+ctx.CacheService.getScriptCache=()=>({get:k=>cache.get(k)||null,put:(k,v)=>cache.set(k,v),remove:k=>cache.delete(k)});
+assert.throws(()=>ctx.login('incorrecta'),/incorrecto/);assert.throws(()=>ctx.login(),/incorrecto/);assert.throws(()=>ctx.login('123'),/incorrecto/);assert.throws(()=>ctx.login('12345'),/incorrecto/);
+values.set('FAMILY_PASSWORD','0123');const zeroToken=ctx.login('0123');ctx.auth_(zeroToken);values.set('FAMILY_PASSWORD','2468');
+cache.set('password_failures','10');assert.throws(()=>ctx.login('2468'),/Demasiados intentos/);cache.delete('password_failures');
+const validToken=ctx.login('2468');assert.ok(validToken.length>32);ctx.auth_(validToken);
+cache.set('session:'+ctx.digest_('old-public-token'),'ok');assert.throws(()=>ctx.auth_('old-public-token'),/sesión/);
+values.set('FAMILY_PASSWORD','1357');assert.throws(()=>ctx.auth_(validToken),/sesión/);values.set('FAMILY_PASSWORD','2468');
+assert.throws(()=>ctx.completeActivity('invalid','event1',started.toISOString(),true),/sesión/);assert.equal(reads,0);cache.set('session:'+ctx.digest_('authorized'),ctx.digest_('2468'));
 ctx.completeActivity('authorized','event1',started.toISOString(),true);assert.equal(writes,0);assert.equal(values.get(ctx.doneKey_('event1',started.toISOString(),false)),'true');assert.equal(ctx.listActivities('authorized','2026-10-19','2026-11-01')[0].done,true);
 ctx.completeActivity('authorized','event1',started.toISOString(),false);assert.equal(writes,0);assert.equal(ctx.listActivities('authorized','2026-10-19','2026-11-01')[0].done,false);
 ctx.completeActivity('authorized','event1',started.toISOString(),true);
