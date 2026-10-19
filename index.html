@@ -19,6 +19,17 @@ input,textarea{width:100%;padding:11px;border:1px solid #dce4d6;border-radius:10
 .event.tone-3{background:#f7efcf;border-color:#eae2c3}
 .event.tone-4{background:#dff0ef;border-color:#cde3e1}
 .event.tone-5{background:#f5e2e9;border-color:#ead1dc}
+
+/* Fecha y alta en una columna; actividades a la altura del número. */
+.daygroup{display:grid;grid-template-columns:36px minmax(0,1fr);column-gap:8px;align-items:start;margin:0 0 10px;border:0}
+.dayrail{display:flex;flex-direction:column;align-items:center;gap:3px}
+.daygroup .date{padding:0;width:36px;text-align:center}
+.daygroup .date span{font-size:9px;line-height:12px}
+.daygroup .date strong{display:block;font-size:20px;line-height:24px}
+.daygroup .date.today{padding:0;border-radius:8px}
+.daygroup .daybody{min-width:0;padding:12px 0 0}
+.dayadd{display:grid;place-items:center;width:30px;height:30px;min-height:30px;padding:0;border:0;border-radius:9px;background:#edf3e9;font-size:20px;line-height:1}
+.daygroup .event:last-child{margin-bottom:0}
 </style></head><body><header><div class="brand">Agenda Familia Martell</div><div class="nav"><span id="mode" class="pill">Conectando</span><button id="logout" class="hidden">Salir</button></div></header>
 <main>
 <section id="gate" class="hidden"></section>
@@ -51,7 +62,7 @@ let html='',colorIndex=0;for(let n=0;n<count;n++){
  if(!items.length)continue;
  const isToday=day===localDay(new Date());
  const cards=items.map(e=>'<article class="event tone-'+(colorIndex++%6)+' '+(e.done?'done':'')+'"><button class="check" data-complete="'+events.indexOf(e)+'" aria-label="'+(e.done?'Marcar pendiente':'Marcar completada')+'" aria-pressed="'+!!e.done+'">'+(e.done?'✓':'')+'</button><div class="eventtext"><strong>'+esc(e.title)+'</strong><small>'+(e.allDay?'Todo el día':stamp(e.start)+' – '+stamp(e.end))+(e.location?' · '+esc(e.location):'')+'</small></div><div class="eventactions"><button class="reschedule" data-reschedule="'+events.indexOf(e)+'" '+(e.recurring?'disabled title="Las repeticiones se reagendan desde Google Calendar"':'')+'>Reagendar</button></div></article>').join('');
- html+='<details class="dayfold" id="day-'+day+'" '+(items.length?'open':'')+'><summary><div class="date '+(isToday?'today':'')+'"><span>'+new Intl.DateTimeFormat('es-AR',{weekday:'short',timeZone:'America/Argentina/Buenos_Aires'}).format(ds)+'</span><strong>'+Number(day.slice(8))+'</strong></div></summary><div class="daybody">'+cards+'<div class="emptyday"><span>'+(items.length?'Agregar otra actividad':'Día libre')+'</span><button data-add="'+day+'" aria-label="Agregar actividad el '+day+'">+</button></div></div></details>';
+ html+='<section class="daygroup" id="day-'+day+'"><div class="dayrail"><div class="date '+(isToday?'today':'')+'"><span>'+new Intl.DateTimeFormat('es-AR',{weekday:'short',timeZone:'America/Argentina/Buenos_Aires'}).format(ds)+'</span><strong>'+Number(day.slice(8))+'</strong></div><button class="dayadd" data-add="'+day+'" aria-label="Agregar actividad el '+day+'">+</button></div><div class="daybody">'+cards+'</div></section>';
 } $('rangeLabel').textContent=start===localDay(new Date())?'Desde hoy · '+new Intl.DateTimeFormat('es-AR',{day:'numeric',month:'long',timeZone:'America/Argentina/Buenos_Aires'}).format(new Date(start+'T12:00:00-03:00')):'Solo días con actividades';$('days').innerHTML=html||'<div class="emptyagenda">'+(start===localDay(new Date())?'No hay actividades desde hoy hasta fin de mes.':'No hay actividades este mes.')+'<br>Podés ingresar una con el botón de arriba.</div>'; 
 }
 async function load(){if(!live){render();return} $('refresh').disabled=true;try{const result=await call('listActivities',token,start,addDays(start,count));events=result;render();$('status').textContent='';}catch(e){$('status').textContent=e.message+' Los datos anteriores pueden estar desactualizados.'}finally{$('refresh').disabled=false}}
