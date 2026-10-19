@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const html=fs.readFileSync(__dirname+'/apps-script/Index.html','utf8'),ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);assert.equal(new Set(ids).size,ids.length,'IDs únicos');
 const elements=Object.fromEntries(ids.map(id=>[id,{innerHTML:'',textContent:'',value:'',classList:{add(){},remove(){}},addEventListener(){},showModal(){this.open=true},close(){this.open=false},focus(){},prepend(){},scrollIntoView(){},querySelectorAll(){return[]}}]));
 class FixedDate extends Date{constructor(...args){super(...(args.length?args:['2026-10-19T14:00:00Z']))}}
-const context=vm.createContext({Intl,Date:FixedDate,Error,console,google:{script:{run:{withSuccessHandler(fn){return {withFailureHandler(){return {listActivities(){fn([])}}}}}}}},crypto:require('node:crypto').webcrypto,document:{getElementById(id){assert.ok(elements[id],'Elemento existente '+id);return elements[id]}},window:{},MutationObserver:class{observe(){}}});
+const context=vm.createContext({Intl,Date:FixedDate,Error,console,google:{script:{run:{withSuccessHandler(fn){return {withFailureHandler(){return {login(){fn('test-session')},listActivities(){fn([])}}}}}}}},crypto:require('node:crypto').webcrypto,document:{getElementById(id){assert.ok(elements[id],'Elemento existente '+id);return elements[id]}},window:{},MutationObserver:class{observe(){}}});
 for(const s of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))vm.runInContext(s[1],context);
 const run=s=>vm.runInContext(s,context);
 assert.equal(run('start'),'2026-10-19');assert.equal(run('count'),13);
