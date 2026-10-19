@@ -2,7 +2,7 @@
 <p id="state">Conexión con Agenda Familia Martell. Abrí la agenda desde <a href="https://oscarmartell.github.io/agenda-familia-martell/" target="_top">GitHub</a>.</p>
 <script>
 const HOST='https://oscarmartell.github.io';
-const METHODS=new Set(['logout','changePin','listActivities','createActivity','completeActivity','rescheduleActivity']);
+const METHODS=new Set(['logout','listActivities','createActivity','completeActivity','rescheduleActivity']);
 let channel='',token='',starting=false;
 function send(data){window.top.postMessage({...data,channel},HOST)}
 function rpc(name,args){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>reject(Error(e.message||'Falló la operación en Familia.')))[name](...args))}
