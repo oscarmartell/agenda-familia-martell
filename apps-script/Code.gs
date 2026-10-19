@@ -73,10 +73,3 @@ function rescheduleActivity(token,p){
  }finally{lock.releaseLock();}
 }
 
-
-// Se cambia desde la agenda con una sesión válida, sin editar ni volver a publicar el proyecto.
-function changePin(token,next){
- auth_(token);if(typeof next!=='string'||!/^\d{4}$/.test(next))throw new Error('El PIN debe tener 4 números.');
- const lock=LockService.getScriptLock();lock.waitLock(10000);
- try{auth_(token);props_().setProperty('FAMILY_PASSWORD',next);const cache=CacheService.getScriptCache();cache.put('session:'+digest_(token),digest_(next),21600);cache.remove('password_failures');return true;}finally{lock.releaseLock();}
-}
