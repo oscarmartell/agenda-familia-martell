@@ -20,14 +20,14 @@ input,textarea{width:100%;padding:11px;border:1px solid #dce4d6;border-radius:10
 .event.tone-4{background:#dff0ef;border-color:#cde3e1}
 .event.tone-5{background:#f5e2e9;border-color:#ead1dc}
 
-/* Fecha y alta en una columna; actividades a la altura del número. */
+/* Fecha y primera actividad alineadas por el borde superior. */
 .daygroup{display:grid;grid-template-columns:36px minmax(0,1fr);column-gap:8px;align-items:start;margin:0 0 10px;border:0}
 .dayrail{display:flex;flex-direction:column;align-items:center;gap:3px}
 .daygroup .date{padding:0;width:36px;text-align:center}
 .daygroup .date span{font-size:9px;line-height:12px}
 .daygroup .date strong{display:block;font-size:20px;line-height:24px}
 .daygroup .date.today{padding:0;border-radius:8px}
-.daygroup .daybody{min-width:0;padding:12px 0 0}
+.daygroup .daybody{min-width:0;padding:0}
 .dayadd{display:grid;place-items:center;width:30px;height:30px;min-height:30px;padding:0;border:0;border-radius:9px;background:#edf3e9;font-size:20px;line-height:1}
 .daygroup .event:last-child{margin-bottom:0}
 </style></head><body><header><div class="brand">Agenda Familia Martell</div><div class="nav"><span id="mode" class="pill">Conectando</span><button id="logout" class="hidden">Salir</button></div></header>
