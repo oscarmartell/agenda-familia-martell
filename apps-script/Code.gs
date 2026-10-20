@@ -25,24 +25,27 @@ function listActivities(token,from,to){
 }
 
 function activityTimes_(p){
- if(!p||!validDay_(p.date)||typeof p.time!=='string'||typeof p.end!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.time)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.end))throw new Error('Revisá la fecha y el horario de la actividad.');
- const endDay=p.endDate||p.date;
- if(!validDay_(endDay))throw new Error('Revisá la fecha de finalización.');
+ if(!p||!validDay_(p.date)||(p.allDay!==undefined&&typeof p.allDay!=='boolean'))throw new Error('Revisá la fecha de inicio.');
+ const endDay=p.endDate||p.date;if(!validDay_(endDay)||endDay<p.date)throw new Error('La fecha de fin debe ser igual o posterior a la fecha de inicio.');
+ if(p.allDay){
+  const a=new Date(p.date+'T00:00:00-03:00'),b=new Date(endDay+'T00:00:00-03:00');b.setUTCDate(b.getUTCDate()+1);
+  const days=(b-a)/86400000;if(days<1||days>366)throw new Error('Elegí un período de entre 1 y 366 días.');return [a,b];
+ }
+ if(typeof p.time!=='string'||typeof p.end!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.time)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.end))throw new Error('Revisá el horario de la actividad.');
  const a=new Date(p.date+'T'+p.time+':00-03:00'),b=new Date(endDay+'T'+p.end+':00-03:00'),duration=b-a;
- if(duration<3600000||duration>86400000)throw new Error('La actividad debe durar como mínimo una hora y como máximo 24 horas.');
- return [a,b];
+ if(duration<3600000||duration>366*86400000)throw new Error('La actividad debe durar al menos una hora. Revisá las fechas y los horarios.');return [a,b];
 }
 
 function createActivity(token,p){
  auth_(token);
- if(!p||typeof p.title!=='string'||!p.title.trim()||p.title.length>180||!validDay_(p.date)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.time)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.end)||typeof p.location!=='string'||p.location.length>250||typeof p.requestId!=='string'||! /^[a-zA-Z0-9-]{20,80}$/.test(p.requestId))throw new Error('Revisá los datos de la actividad.');
+ if(!p||typeof p.title!=='string'||!p.title.trim()||p.title.length>180||!validDay_(p.date)||typeof p.location!=='string'||p.location.length>250||typeof p.requestId!=='string'||! /^[a-zA-Z0-9-]{20,80}$/.test(p.requestId))throw new Error('Revisá los datos de la actividad.');
  const times=activityTimes_(p),a=times[0],b=times[1];
  const lock=LockService.getScriptLock();lock.waitLock(20000);
  try{
   const cal=calendar_(),matches=cal.getEvents(new Date(p.date+'T00:00:00-03:00'),new Date(p.date+'T23:59:59-03:00'));
-  const prior=matches.find(function(e){return e.getTag('familia_request')===p.requestId||(e.getTitle()===p.title.trim()&&e.getStartTime().getTime()===a.getTime()&&e.getEndTime().getTime()===b.getTime());});
+  const prior=matches.find(function(e){return e.getTag('familia_request')===p.requestId||(e.getTitle()===p.title.trim()&&e.isAllDayEvent()===!!p.allDay&&e.getStartTime().getTime()===a.getTime()&&e.getEndTime().getTime()===b.getTime());});
   if(prior)return {id:prior.getId(),duplicate:true};
-  const event=cal.createEvent(p.title.trim(),a,b,{location:p.location});event.setTag('familia_request',p.requestId);return {id:event.getId(),duplicate:false};
+  const event=p.allDay?cal.createAllDayEvent(p.title.trim(),a,b,{location:p.location}):cal.createEvent(p.title.trim(),a,b,{location:p.location});event.setTag('familia_request',p.requestId);return {id:event.getId(),duplicate:false};
  }finally{lock.releaseLock();}
 }
 // El estado pertenece a la app: nunca se escribe una etiqueta ni otro campo de Calendar.
@@ -63,7 +66,7 @@ function rescheduleActivity(token,p){
   const event=calendar_().getEventById(p.id);if(!event)throw new Error('La actividad ya no existe. Actualizá la agenda.');
   if(event.isRecurringEvent())throw new Error('Para cambiar una repetición, abrí Google Calendar. Las actividades individuales sí se pueden reagendar aquí.');
   const allDay=event.isAllDayEvent();let a,b;
-  if(allDay){const duration=Math.round((new Date(p.originalEnd)-new Date(p.originalStart))/86400000);if(duration<1||duration>366)throw new Error('Duración inválida.');a=new Date(p.date+'T00:00:00-03:00');b=new Date(a.getTime()+duration*86400000);}
+  if(allDay){if(p.endDate){const times=activityTimes_({date:p.date,endDate:p.endDate,allDay:true});a=times[0];b=times[1];}else{const duration=Math.round((new Date(p.originalEnd)-new Date(p.originalStart))/86400000);if(duration<1||duration>366)throw new Error('Duración inválida.');a=new Date(p.date+'T00:00:00-03:00');b=new Date(a.getTime()+duration*86400000);}}
   else {const times=activityTimes_(p);a=times[0];b=times[1];}
   // Reintentos a la misma fecha son seguros; no se crea un segundo evento.
   if(event.getStartTime().getTime()===a.getTime()&&event.getEndTime().getTime()===b.getTime())return {id:event.getId(),unchanged:true};
