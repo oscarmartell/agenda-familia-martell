@@ -39,7 +39,19 @@ input,textarea{width:100%;padding:11px;border:1px solid #dce4d6;border-radius:10
 function localDay(d){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).format(d)}
 </script><script>
 const $=id=>document.getElementById(id),live=true;let token='',events=[],start=localDay(new Date()),count=14,requestId='',editing=null;
-function selectMonth(day){const d=new Date(day+'T12:00:00-03:00');d.setUTCDate(1);const first=localDay(d),today=localDay(new Date());start=first.slice(0,7)===today.slice(0,7)?today:first;count=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate()-Number(start.slice(8))+1}
+let pendingScrollDay=null;
+function selectMonth(day){
+ const d=new Date(day+'T12:00:00-03:00');d.setUTCDate(1);
+ start=localDay(d);count=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate();
+ pendingScrollDay=day;
+}
+function scrollToDay(day,behavior='auto'){
+ const list=$('days'),groups=Array.from(list.querySelectorAll('.daygroup'));
+ const target=$('day-'+day)||groups.find(el=>el.id.slice(4)>=day)||groups[groups.length-1];
+ if(!target){list.scrollTop=0;return}
+ const top=target.getBoundingClientRect().top-list.getBoundingClientRect().top+list.scrollTop-8;
+ list.scrollTo({top:Math.max(0,top),behavior});
+}
 selectMonth(start);
 const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function addDays(s,n){const d=new Date(s+'T12:00:00-03:00');d.setUTCDate(d.getUTCDate()+n);return localDay(d)}
@@ -94,14 +106,22 @@ let html='',colorIndex=0;for(let n=0;n<count;n++){
  const isToday=day===localDay(new Date());
  const cards=items.map(e=>'<article class="event tone-'+(colorIndex++%6)+' '+(e.done?'done':'')+'"><button class="check" data-complete="'+events.indexOf(e)+'" aria-label="'+(e.done?'Marcar pendiente':'Marcar completada')+'" aria-pressed="'+!!e.done+'">'+(e.done?'✓':'')+'</button><div class="eventtext"><strong>'+esc(e.title)+'</strong><small>'+(e.allDay?'Todo el día':stamp(e.start)+' – '+stamp(e.end))+(e.location?' · '+esc(e.location):'')+'</small></div><div class="eventactions"><button class="reschedule" data-reschedule="'+events.indexOf(e)+'" '+(e.recurring?'disabled title="Las repeticiones se reagendan desde Google Calendar"':'')+'>Reagendar</button></div></article>').join('');
  html+='<section class="daygroup" id="day-'+day+'"><div class="dayrail"><div class="date '+(isToday?'today':'')+'"><span>'+new Intl.DateTimeFormat('es-AR',{weekday:'short',timeZone:'America/Argentina/Buenos_Aires'}).format(ds)+'</span><strong>'+Number(day.slice(8))+'</strong></div><button class="dayadd" data-add="'+day+'" aria-label="Agregar actividad el '+day+'">+</button></div><div class="daybody">'+cards+'</div></section>';
-} $('rangeLabel').textContent=start===localDay(new Date())?'Desde hoy · '+new Intl.DateTimeFormat('es-AR',{day:'numeric',month:'long',timeZone:'America/Argentina/Buenos_Aires'}).format(new Date(start+'T12:00:00-03:00')):'Solo días con actividades';$('days').innerHTML=html||'<div class="emptyagenda">'+(start===localDay(new Date())?'No hay actividades desde hoy hasta fin de mes.':'No hay actividades este mes.')+'<br>Podés ingresar una con el botón de arriba.</div>'; 
+} $('rangeLabel').textContent='Mes completo';$('days').innerHTML=html||'<div class="emptyagenda">'+(start===localDay(new Date())?'No hay actividades este mes.':'No hay actividades este mes.')+'<br>Podés ingresar una con el botón de arriba.</div>'; 
 }
-async function load(){if(!live){render();return} $('refresh').disabled=true;try{const result=await call('listActivities',token,start,addDays(start,count));events=result;render();$('status').textContent='';}catch(e){$('status').textContent=e.message+' Los datos anteriores pueden estar desactualizados.'}finally{$('refresh').disabled=false}}
+async function load(){
+ if(!live){render();return}
+ const previousScroll=$('days').scrollTop;$('refresh').disabled=true;
+ try{
+  events=await call('listActivities',token,start,addDays(start,count));render();$('status').textContent='';
+  if(pendingScrollDay){scrollToDay(pendingScrollDay);pendingScrollDay=null}else{$('days').scrollTop=previousScroll}
+ }catch(e){$('status').textContent=e.message+' Los datos anteriores pueden estar desactualizados.'}
+ finally{$('refresh').disabled=false}
+}
 $('cancel').onclick=()=>$('activityDialog').close();
 $('review').onsubmit=async e=>{e.preventDefault();const payload={title:$('title').value.trim(),date:$('dateInput').value,endDate:$('endDateInput').value,allDay:$('allDayInput').checked,time:$('timeInput').value,end:$('endInput').value,location:$('location').value.trim(),requestId};try{Object.assign(payload,plannedTiming(payload));}catch(err){$('status').textContent=err.message;return}busy(e.target,true);try{const wasReschedule=!!editing;if(!live)throw Error('Abrí la agenda real para guardar.');if(editing){await call('rescheduleActivity',token,{id:editing.id,originalStart:editing.start,originalEnd:editing.end,date:payload.date,time:payload.time,end:payload.end,endDate:payload.endDate,allDay:payload.allDay})}else{await call('createActivity',token,payload)}selectMonth(payload.date);await load();$('review').classList.add('hidden');$('activityDialog').close();resetActivityMode();$('status').textContent=wasReschedule?'Actividad reagendada en Familia.':'Agendado en Familia.';}catch(e){$('status').textContent=e.message+' Si la conexión falló, actualizá antes de volver a confirmar.'}finally{busy($('review'),false)}};
 $('days').onclick=async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.add){openNewActivity(b.dataset.add);return}if(b.dataset.reschedule!==undefined){openReschedule(events[Number(b.dataset.reschedule)]);return}if(b.dataset.complete!==undefined){const event=events[Number(b.dataset.complete)];b.disabled=true;try{if(live)await call('completeActivity',token,event.id,event.start,!event.done);event.done=!event.done;render()}catch(e){$('status').textContent=e.message;b.disabled=false}}};
-$('prev').onclick=()=>{const d=new Date(start+'T12:00:00-03:00');d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-1);selectMonth(localDay(d));load()};$('next').onclick=()=>{const d=new Date(start+'T12:00:00-03:00');d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+1);selectMonth(localDay(d));load()};$('today').onclick=async()=>{selectMonth(localDay(new Date()));await load();const el=$('day-'+localDay(new Date()));if(el)el.scrollIntoView({behavior:'smooth',block:'center'})};$('refresh').onclick=load;
-const originalLoad=load;load=async function(){await originalLoad();$('days').scrollTop=0};
+$('prev').onclick=()=>{const d=new Date(start+'T12:00:00-03:00');d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-1);selectMonth(localDay(d));load()};$('next').onclick=()=>{const d=new Date(start+'T12:00:00-03:00');d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+1);selectMonth(localDay(d));load()};$('today').onclick=async()=>{selectMonth(localDay(new Date()));await load()};$('refresh').onclick=load;
+
 $('app').classList.remove('hidden');$('gate').classList.add('hidden');$('demoNotice').classList.add('hidden');$('mode').textContent='Conectando';
 window.familyBridge.onReady=()=>{};
 window.familyBridge.onError=message=>{$('globalStatus').textContent=message};
