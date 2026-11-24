@@ -33,7 +33,7 @@ input,textarea{width:100%;padding:11px;border:1px solid #dce4d6;border-radius:10
 .daygroup .date.today{padding:0;border-radius:8px}
 .daygroup .daybody{min-width:0;padding:0}
 .dayadd{display:grid;place-items:center;width:30px;height:30px;min-height:30px;padding:0;border:0;border-radius:9px;background:#edf3e9;font-size:20px;line-height:1}
-.daygroup .event:last-child{margin-bottom:0}
+.daygroup .event:last-child{margin-bottom:0}.daygroup:has(.date.today){background:#f0f6e9;border-radius:12px;padding:7px 5px;outline:2px solid #aac9a7}.daygroup .emptyday{min-height:34px;padding:7px 4px;color:#87948b}
 .activityDialog .review{margin:0;padding:0;border:0}.activityDialog .review>h2{display:none}.all-day-option{display:flex;align-items:center;gap:8px;margin:12px 0}.all-day-option input{width:18px;height:18px;margin:0;accent-color:var(--green)}</style><link rel="manifest" href="./manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="apple-touch-icon" href="./app-icon.svg"></head><body><header><div class="brand">Agenda Familia Martell</div><div class="nav"><span id="mode" class="pill">Conectando</span><button id="logout" class="hidden">Salir</button></div></header>
 <main>
 <section id="gate" class="hidden"></section>
@@ -124,7 +124,7 @@ function render(){
 const d=new Date(start+'T12:00:00-03:00');$('month').textContent=monthWithYear.format(d);
 let html='',colorIndex=0;for(let n=0;n<count;n++){
  const day=addDays(start,n),ds=new Date(day+'T12:00:00-03:00'),items=events.filter(e=>e.allDay?day>=e.startDay&&day<e.endDay:day>=localDay(new Date(e.start))&&day<=localDay(new Date(new Date(e.end).getTime()-1))).sort((a,b)=>a.start.localeCompare(b.start));
- if(!items.length)continue;
+
  const isToday=day===localDay(new Date());
  const cards=items.map(e=>'<article class="event tone-'+(colorIndex++%6)+' '+(e.done?'done':'')+'"><button class="check" data-complete="'+events.indexOf(e)+'" aria-label="'+(e.done?'Marcar pendiente':'Marcar completada')+'" aria-pressed="'+!!e.done+'">'+(e.done?'✓':'')+'</button><div class="eventtext"><strong>'+esc(e.title)+'</strong><small>'+(e.allDay?'Todo el día':stamp(e.start)+' – '+stamp(e.end))+(e.location?' · '+esc(e.location):'')+'</small></div><div class="eventactions"><button class="reschedule" data-reschedule="'+events.indexOf(e)+'" '+(e.recurring?'disabled title="Las repeticiones se reagendan desde Google Calendar"':'')+'>Reagendar</button></div></article>').join('');
  html+='<section class="daygroup" id="day-'+day+'"><div class="dayrail"><div class="date '+(isToday?'today':'')+'"><span>'+new Intl.DateTimeFormat('es-AR',{weekday:'short',timeZone:'America/Argentina/Buenos_Aires'}).format(ds)+'</span><strong>'+Number(day.slice(8))+'</strong></div><button class="dayadd" data-add="'+day+'" aria-label="Agregar actividad el '+day+'">+</button></div><div class="daybody">'+cards+'</div></section>';
@@ -162,6 +162,7 @@ window.familyBridge.onError=message=>{$('globalStatus').textContent=message};
 async function connectAgenda(){busy($('app'),true);$('retryConnection').classList.add('hidden');$('globalStatus').textContent='Cargando actividades de Familia…';try{await window.familyBridge.start();await window.familyBridge.call('login',[]);token='connected';$('mode').textContent='Familia';$('globalStatus').textContent='';busy($('app'),false);await load()}catch(err){$('mode').textContent='Sin conexión';$('globalStatus').textContent=/FAMILY_PASSWORD|PIN|contraseña/i.test(err.message)?'La versión publicada de Google todavía exige contraseña. Actualizá Código.gs con la versión actual y publicá una Nueva versión de la misma implementación.':err.message;$('retryConnection').disabled=false;$('retryConnection').classList.remove('hidden')}}
 $('retryConnection').onclick=connectAgenda;
 connectAgenda();
+window.addEventListener('pageshow',()=>{const today=localDay(new Date());selectMonth(today);if(token)load();else render()});
 
 const activityDialog=$('activityDialog');
 function openNewActivity(day=localDay(new Date())){
